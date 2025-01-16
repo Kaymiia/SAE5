@@ -1,0 +1,17 @@
+# Active le module de réécriture
+RewriteEngine On
+
+# Permettre les requêtes CORS
+Header set Access-Control-Allow-Origin "*"
+Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+Header set Access-Control-Allow-Headers "Content-Type"
+
+# Autoriser l'accès à tous les fichiers
+<Directory "/var/www/html">
+    Options Indexes FollowSymLinks
+    AllowOverride All
+    Require all granted
+</Directory>
+
+# Rediriger les requêtes API
+RewriteRule ^api/(.*)$ api/$1 [QSA,L]

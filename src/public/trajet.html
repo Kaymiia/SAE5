@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TomTom Map Display</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="assets/css/styles.css">
     <script src="https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.23.0/maps/maps-web.min.js"></script>
     <link rel="stylesheet" href="https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.23.0/maps/maps.css">
 </head>
@@ -24,21 +24,118 @@
             </select>
             <label for="colorPicker">Couleur :</label>
             <input type="color" id="colorPicker" value="#3498db" onchange="updateRouteColor(this.value)" />
-            <button onclick="saveModalData()">Valider</button>
+            <button onclick="initializeRoute()">Valider</button>
         </div>
     </div>
 
     <div class="menu">
-      <h2>Menu</h2>
-      <input type="text" id="addressInput" placeholder="Enter address" oninput="getSuggestions(this.value)" />
-      <div id="suggestions"></div>
-      <button id="addAddressBtn">Add Address</button>
-      <ul id="addressList"></ul>
+        <h2 onclick="window.location.href='index.html'">Menu</h2>
+        <input type="text" id="addressInput" placeholder="Enter address" oninput="getSuggestions(this.value)" />
+        <div id="suggestions"></div>
+        <button id="addAddressBtn">Add Address</button>
+        <button id="saveRouteBtn" style="display: none;">Sauvegarder</button>
+        <ul id="addressList"></ul>
     </div>
     <div id="map" class="map-container"></div>
     <div id="marker-popup" class="marker-popup"></div>
 
     <script>
+        let currentRouteId = null;
+        const apiKey = "60VNodsf8hMWrISHkNcXYtbfFycmRhyh";
+        let addressData = [];
+        let markers = [];
+        let routeLayers = [];
+
+        // Générer l'ID du trajet au format AAMMJJNN
+        function generateRouteId() {
+            const now = new Date();
+            const year = now.getFullYear().toString().slice(-2);
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+            const day = now.getDate().toString().padStart(2, '0');
+            
+            // Récupérer le dernier numéro de séquence pour aujourd'hui
+            // Pour cet exemple, on utilise localStorage, mais dans une vraie application,
+            // cela devrait venir de la base de données
+            const today = `${year}${month}${day}`;
+            let sequence = parseInt(localStorage.getItem(`seq_${today}`) || '0') + 1;
+            localStorage.setItem(`seq_${today}`, sequence.toString());
+            
+            return `${year}${month}${day}${sequence.toString().padStart(2, '0')}`;
+        }
+
+        // Initialiser un nouveau trajet
+        function initializeRoute() {
+            const selectedDay = document.getElementById('daySelect').value;
+            const selectedColor = document.getElementById('colorPicker').value;
+            currentRouteId = generateRouteId();
+            
+            // Stockage des informations de base du trajet
+            localStorage.setItem('selectedDay', selectedDay);
+            localStorage.setItem('selectedColor', selectedColor);
+            
+            // Afficher le bouton de sauvegarde
+            document.getElementById('saveRouteBtn').style.display = 'block';
+            
+            // Fermer la modale
+            document.getElementById('modal').style.display = 'none';
+        }
+
+        // Sauvegarder le trajet complet
+        async function saveRoute() {
+            if (!currentRouteId || addressData.length === 0) {
+                alert("Aucun trajet à sauvegarder");
+                return;
+            }
+
+            try {
+                const routeData = {
+                    day_of_week: localStorage.getItem('selectedDay'),
+                    color: localStorage.getItem('selectedColor'),
+                    waypoints: addressData.map((addr, index) => ({
+                        address: addr.text,
+                        latitude: addr.coordinates[1],
+                        longitude: addr.coordinates[0],
+                        position_order: index
+                    }))
+                };
+
+                console.log('Envoi des données:', routeData);
+
+                const response = await fetch('http://localhost:8080/api/routes.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(routeData)
+                });
+
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const textResponse = await response.text();
+                    console.error('Réponse non-JSON reçue:', textResponse);
+                    throw new Error('Réponse invalide du serveur');
+                }
+
+                const result = await response.json();
+                console.log('Réponse du serveur:', result);
+
+                if (result.status === 'success') {
+                    alert(result.message || "Trajet sauvegardé avec succès!");
+                    window.location.href = 'index.html';
+                } else {
+                    throw new Error(result.message || "Erreur lors de la sauvegarde");
+                }
+
+            } catch (error) {
+                console.error('Erreur complète:', error);
+                alert("Erreur lors de la sauvegarde: " + error.message);
+            }
+        }
+
+        // Ajouter l'écouteur d'événement pour le bouton de sauvegarde
+        document.getElementById('saveRouteBtn').addEventListener('click', saveRoute);
+
         // Afficher la modale si nécessaire
         window.onload = function() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -48,22 +145,46 @@
         };
 
         // Sauvegarder les données de la modale
-        function saveModalData() {
+        async function saveModalData() {
             const selectedDay = document.getElementById('daySelect').value;
             const selectedColor = document.getElementById('colorPicker').value;
 
-            // Stocker les données dans localStorage
-            localStorage.setItem('selectedDay', selectedDay);
-            localStorage.setItem('selectedColor', selectedColor);
+            // Préparer les données de la route
+            const routeData = {
+                name: "Route du " + selectedDay,
+                day_of_week: selectedDay,
+                color: selectedColor,
+                waypoints: addressData.map((addr, index) => ({
+                    address: addr.text,
+                    latitude: addr.coordinates[1],
+                    longitude: addr.coordinates[0],
+                    position_order: index
+                }))
+            };
 
-            // Masquer la modale
-            document.getElementById('modal').style.display = 'none';
+            try {
+                const response = await fetch('api/routes.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(routeData)
+                });
+
+                const result = await response.json();
+                if (result.status === 'success') {
+                    localStorage.setItem('selectedDay', selectedDay);
+                    localStorage.setItem('selectedColor', selectedColor);
+                    document.getElementById('modal').style.display = 'none';
+                } else {
+                    showError("Erreur lors de la sauvegarde du trajet");
+                }
+            } catch (error) {
+                console.error('Error saving route:', error);
+                showError("Erreur lors de la sauvegarde du trajet");
+            }
         }
 
-        const apiKey = "60VNodsf8hMWrISHkNcXYtbfFycmRhyh";
-        let addressData = [];
-        let markers = [];
-        let routeLayers = [];
         const popup = document.getElementById('marker-popup');
 
         const map = tt.map({
