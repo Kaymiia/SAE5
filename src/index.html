@@ -9,11 +9,29 @@
     <link rel="stylesheet" href="https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.23.0/maps/maps.css">
 </head>
 <body>
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <h2>Configurer le trajet</h2>
+            <label for="daySelect">Jour de la semaine :</label>
+            <select id="daySelect">
+                <option value="lundi">Lundi</option>
+                <option value="mardi">Mardi</option>
+                <option value="mercredi">Mercredi</option>
+                <option value="jeudi">Jeudi</option>
+                <option value="vendredi">Vendredi</option>
+                <option value="samedi">Samedi</option>
+                <option value="dimanche">Dimanche</option>
+            </select>
+            <label for="colorPicker">Couleur :</label>
+            <input type="color" id="colorPicker" value="#3498db" onchange="updateRouteColor(this.value)" />
+            <button onclick="saveModalData()">Valider</button>
+        </div>
+    </div>
+
     <div class="menu">
       <h2>Menu</h2>
       <input type="text" id="addressInput" placeholder="Enter address" oninput="getSuggestions(this.value)" />
       <div id="suggestions"></div>
-      <input type="color" id="colorPicker" value="#3498db" />
       <button id="addAddressBtn">Add Address</button>
       <ul id="addressList"></ul>
     </div>
@@ -21,6 +39,27 @@
     <div id="marker-popup" class="marker-popup"></div>
 
     <script>
+        // Afficher la modale si nécessaire
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('openModal') === 'true') {
+                document.getElementById('modal').style.display = 'flex';
+            }
+        };
+
+        // Sauvegarder les données de la modale
+        function saveModalData() {
+            const selectedDay = document.getElementById('daySelect').value;
+            const selectedColor = document.getElementById('colorPicker').value;
+
+            // Stocker les données dans localStorage
+            localStorage.setItem('selectedDay', selectedDay);
+            localStorage.setItem('selectedColor', selectedColor);
+
+            // Masquer la modale
+            document.getElementById('modal').style.display = 'none';
+        }
+
         const apiKey = "60VNodsf8hMWrISHkNcXYtbfFycmRhyh";
         let addressData = [];
         let markers = [];
@@ -195,11 +234,11 @@
 
         async function redrawRoutes() {
             clearRoutes();
+            const routeColor = localStorage.getItem('selectedColor') || '#3498db';
             
             for (let i = 0; i < addressData.length - 1; i++) {
                 const start = addressData[i].coordinates;
                 const end = addressData[i + 1].coordinates;
-                const routeColor = document.getElementById('colorPicker').value;
                 
                 try {
                     const response = await fetch(
@@ -276,6 +315,7 @@
         }
 
         function updateRouteColor(color) {
+            localStorage.setItem('selectedColor', color);
             if (routeLayers.length > 0) {
                 routeLayers.forEach(layerId => {
                     if (map.getLayer(layerId)) {
@@ -284,10 +324,6 @@
                 });
             }
         }
-
-        document.getElementById('colorPicker').addEventListener('change', function(e) {
-            updateRouteColor(e.target.value);
-        });
 
         document.getElementById('addAddressBtn').addEventListener('click', addAddress);
     </script>

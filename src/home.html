@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trajets - Accueil</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .home-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #ecf0f1;
+            font-family: Arial, sans-serif;
+        }
+        .home-container h1 {
+            font-size: 36px;
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        .home-container .buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .home-container .buttons button {
+            font-size: 18px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background-color: #34495e;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .home-container .buttons button:hover {
+            background-color: #1abc9c;
+        }
+    </style>
+</head>
+<body>
+    <div class="home-container">
+        <h1>Bienvenue</h1>
+        <div class="buttons">
+            <button onclick="openNewRoute()">Créer un nouveau trajet</button>
+            <button onclick="window.location.href='trajets.html'">Voir les trajets</button>
+        </div>
+    </div>
+    <script>
+        function openNewRoute() {
+            // Ouvre index.html avec une modale
+            window.location.href = 'index.html?openModal=true';
+        }
+    </script>
+</body>
+</html>
