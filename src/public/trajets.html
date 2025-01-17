@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tous les Trajets</title>
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <script src="https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.23.0/maps/maps-web.min.js"></script>
+    <link rel="stylesheet" href="https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.23.0/maps/maps.css">
+</head>
+<body>
+    <div class="menu">
+        <h2 onclick="window.location.href='index.html'" style="cursor: pointer;">Menu</h2>
+        <div id="routesList"></div>
+    </div>
+    <div id="map" class="map-container"></div>
+    <div id="marker-popup" class="marker-popup"></div>
+
+    <script>
+        const apiKey = "60VNodsf8hMWrISHkNcXYtbfFycmRhyh";
+        let map;
+        let currentRoutes = new Map(); // Pour stocker les routes actuellement affichées
+
+        // Initialisation de la carte
+        map = tt.map({
+            key: apiKey,
+            container: "map",
+            center: [6.4481, 48.1833], // Mêmes coordonnées que trajet.html
+            zoom: 11,
+        });
+
+        // Fonction pour créer un élément de marqueur
+        function createMarkerElement(address, index, total) {
+            const element = document.createElement('div');
+            
+            if (index === 0) {
+                element.className = 'marker-start';
+            } else if (index === total - 1) {
+                element.className = 'marker-end';
+            } else {
+                element.className = 'marker-middle';
+            }
+            
+            return element;
+        }
+
+        // Fonction pour afficher un trajet
+        async function displayRoute(route, waypoints) {
+            const routeId = route.id;
+            const routeColor = '#' + route.color;
+            
+            // Supprimer l'ancien trajet s'il existe
+            if (currentRoutes.has(routeId)) {
+                const oldRoute = currentRoutes.get(routeId);
+                oldRoute.markers.forEach(marker => marker.remove());
+                oldRoute.layers.forEach(layerId => {
+                    if (map.getLayer(layerId)) {
+                        map.removeLayer(layerId);
+                        map.removeSource(layerId);
+                    }
+                });
+            }
+
+            const markers = [];
+            const routeLayers = [];
+
+            // Création des marqueurs
+            waypoints.forEach((waypoint, index) => {
+                const markerElement = createMarkerElement(waypoint.address, index, waypoints.length);
+                const marker = new tt.Marker({ element: markerElement })
+                    .setLngLat([waypoint.longitude, waypoint.latitude])
+                    .addTo(map);
+                markers.push(marker);
+            });
+
+            // Tracé des segments de route
+            for (let i = 0; i < waypoints.length - 1; i++) {
+                const start = waypoints[i];
+                const end = waypoints[i + 1];
+                
+                try {
+                    const response = await fetch(
+                        `https://api.tomtom.com/routing/1/calculateRoute/${start.latitude},${start.longitude}:${end.latitude},${end.longitude}/json?key=${apiKey}`
+                    );
+                    const data = await response.json();
+                    const routePath = data.routes[0].legs[0].points.map(point => [point.longitude, point.latitude]);
+                    const routeLayerId = `route-${routeId}-${i}`;
+                    
+                    map.addLayer({
+                        id: routeLayerId,
+                        type: 'line',
+                        source: {
+                            type: 'geojson',
+                            data: {
+                                type: 'Feature',
+                                geometry: {
+                                    type: 'LineString',
+                                    coordinates: routePath,
+                                },
+                            },
+                        },
+                        paint: {
+                            'line-color': routeColor,
+                            'line-width': 6,
+                        },
+                    });
+                    
+                    routeLayers.push(routeLayerId);
+                } catch (error) {
+                    console.error('Erreur lors du calcul de l\'itinéraire:', error);
+                }
+            }
+
+            // Sauvegarder les références pour nettoyage ultérieur
+            currentRoutes.set(routeId, { markers, layers: routeLayers });
+        }
+
+        // Fonction pour charger et afficher tous les trajets
+        async function loadRoutes() {
+            try {
+                const response = await fetch('http://localhost:8080/api/routes.php');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    const routesList = document.getElementById('routesList');
+                    routesList.innerHTML = '';
+
+                    // Pour chaque route, créer un bouton et charger ses waypoints
+                    for (const route of data.data) {
+                        // Créer le bouton pour la route
+                        const routeButton = document.createElement('button');
+                        routeButton.textContent = `${route.day_of_week}`;
+                        routeButton.style.borderLeft = `4px solid #${route.color}`;
+                        
+                        // Charger les waypoints de cette route
+                        routeButton.onclick = async () => {
+                            try {
+                                const waypointsResponse = await fetch(`http://localhost:8080/api/routes.php?id=${route.id}`);
+                                const waypointsData = await waypointsResponse.json();
+                                
+                                if (waypointsData.status === 'success') {
+                                    // Organiser les waypoints
+                                    const routeInfo = waypointsData.data[0];
+                                    const waypoints = waypointsData.data
+                                        .filter(wp => wp.waypoint_id !== null)
+                                        .sort((a, b) => a.position_order - b.position_order)
+                                        .map(wp => ({
+                                            latitude: parseFloat(wp.latitude),
+                                            longitude: parseFloat(wp.longitude),
+                                            address: wp.address
+                                        }));
+                                    
+                                    // Afficher le trajet sur la carte
+                                    await displayRoute(route, waypoints);
+                                }
+                            } catch (error) {
+                                console.error('Erreur lors du chargement des waypoints:', error);
+                            }
+                        };
+                        
+                        routesList.appendChild(routeButton);
+                    }
+                }
+            } catch (error) {
+                console.error('Erreur lors du chargement des routes:', error);
+            }
+        }
+
+        // Charger les routes au chargement de la page
+        window.onload = loadRoutes;
+    </script>
+</body>
+</html>
