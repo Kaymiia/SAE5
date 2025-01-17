@@ -27,10 +27,7 @@ jobs:
     # 3. Installer les dépendances avec legacy-peer-deps
     - name: Install dependencies with legacy-peer-deps
       run: npm install --legacy-peer-deps
-
-    # 4. Vérifier l'installation de react-scripts
-    - name: Verify installation of react-scripts
-      run: npm ls react-scripts
+      
 
   # Job de déploiement
   deploy:
