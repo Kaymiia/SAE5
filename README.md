@@ -1,13 +1,13 @@
-Docker :
+**Docker :**
 
 A la racine du projet : 
 > docker-compose build
 
 > docker-compose up -d
 
+---
 
-
-Les adresses : 
+**Les adresses : **
 
 API : http://localhost:3306
 
