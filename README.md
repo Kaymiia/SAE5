@@ -7,7 +7,7 @@ A la racine du projet :
 
 ---
 
-**Les adresses : **
+**Les adresses :**
 
 API : http://localhost:3306
 
