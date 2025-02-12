@@ -82,7 +82,7 @@ class _HomePageState extends State<HomePage> {
           color: Colors.green[800],
           backgroundColor: Colors.white,
           child: SingleChildScrollView(
-            child: Container(
+            child: SizedBox(
               height: 2000,
               child: Column(
                 children: [
