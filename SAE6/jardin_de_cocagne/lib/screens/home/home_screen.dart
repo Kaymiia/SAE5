@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:jardin_de_cocagne/screens/map/map_screen.dart';
+import 'package:jardin_de_cocagne/screens/shop/shop_screen.dart';
+
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -318,6 +321,14 @@ class _HomePageState extends State<HomePage> {
                   label: 'Calendrier',
                 ),
               ],
+              onTap: (index) {
+                if (index == 3) { // Index pour l'onglet Trajets
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const MapScreen()),
+                  );
+                }
+              },
             ),
           ),
           Positioned(
@@ -341,14 +352,19 @@ class _HomePageState extends State<HomePage> {
                       shape: BoxShape.circle,
                     ),
                     child: IconButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: () {},
-                      icon: const Icon(
-                        Icons.shopping_basket,
-                        size: 32,
-                        color: Colors.white,
-                      ),
+                    padding: EdgeInsets.zero,
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ShopScreen()),
+                      );
+                    },
+                    icon: const Icon(
+                      Icons.shopping_basket,
+                      size: 32,
+                      color: Colors.white,
                     ),
+                  ),
                   ),
                 ),
               ),
