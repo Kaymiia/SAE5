@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:jardin_de_cocagne/models/subscription.dart';
 import 'package:jardin_de_cocagne/repositories/subscription_repository.dart';
+import 'package:jardin_de_cocagne/screens/shop/shop_screen.dart';
 
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({super.key});
@@ -456,7 +457,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     child: IconButton(
                       padding: EdgeInsets.zero,
                       onPressed: () {
-                        // Navigation vers la boutique
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const ShopScreen()),
+                        );
                       },
                       icon: const Icon(
                         Icons.shopping_basket,

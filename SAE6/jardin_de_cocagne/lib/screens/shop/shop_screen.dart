@@ -191,16 +191,22 @@ class _ShopScreenState extends State<ShopScreen> {
                   ),
                 ],
                 onTap: (index) {
-                  if (index == 0) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const HomePage()),
-                    );
-                  }
                   if (index == 3) {
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const DeliveryMapScreen()),
+                    );
+                  }
+                  else if (index == 1) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SubscriptionScreen()),
+                    );
+                  }
+                  else if (index == 0) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const HomePage()),
                     );
                   }
                 },

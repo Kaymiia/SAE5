@@ -366,6 +366,12 @@ class _HomePageState extends State<HomePage> {
                       MaterialPageRoute(builder: (context) => const SubscriptionScreen()),
                     );
                   }
+                  else if (index == 0) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const HomePage()),
+                    );
+                  }
                 },
               ),
             ),

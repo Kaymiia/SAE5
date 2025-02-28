@@ -179,49 +179,6 @@ class _BasketDetailScreenState extends State<BasketDetailScreen> {
     setState(() {
       _enChargement = true;
     });
-
-    try {
-      // Créer un nouvel abonnement
-      final nouvelAbonnement = {
-        'basketId': basket.id,
-        'basketName': basket.name,
-        'basketType': basket.name.contains('Petit')
-            ? 'petit'
-            : basket.name.contains('Grand')
-                ? 'grand'
-                : 'moyen',
-        'frequency': 'Hebdomadaire',
-        'deliveryDay': _jourSelectionne,
-        'deliveryPointId': 'default',
-        'deliveryPointName': 'Point de livraison par défaut',
-        'status': 'Actif',
-        'startDate': DateFormat('yyyy-MM-dd').format(DateTime.now()),
-        'price': basket.price,
-      };
-
-      // Appel au repository pour créer l'abonnement
-      await Future.delayed(const Duration(seconds: 1)); // Simuler un appel API
-
-      Navigator.pop(context); // Fermer la popup
-      
-      // Redirection vers la page des abonnements
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const SubscriptionScreen()),
-      );
-    } catch (e) {
-      setState(() {
-        _enChargement = false;
-      });
-      
-      // Afficher un message d'erreur
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
   }
 
   @override
