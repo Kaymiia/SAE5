@@ -1,14 +1,13 @@
 // lib/models/basket.dart
+import 'package:jardin_de_cocagne/models/basket_product.dart';
+
 class Basket {
-  final int id;
+  final String id; // ID sous forme de chaîne de caractères
   final String name;
   final double price;
   final String description;
   final String imageUrl;
   final String weight;
-  final bool isActive;
-  final DateTime createdAt;
-  final DateTime updatedAt;
   final List<BasketProduct> products;
 
   Basket({
@@ -18,57 +17,26 @@ class Basket {
     required this.description,
     required this.imageUrl,
     required this.weight,
-    required this.isActive,
-    required this.createdAt,
-    required this.updatedAt,
-    this.products = const [],
+    required this.products,
   });
 
-  factory Basket.fromMap(Map<String, dynamic> map, [List<BasketProduct> products = const []]) {
-    return Basket(
-      id: map['id'],
-      name: map['name'],
-      price: map['price'],
-      description: map['description'] ?? '',
-      imageUrl: map['image_url'] ?? 'assets/images/placeholder.png',
-      weight: map['weight'] ?? '',
-      isActive: map['is_active'] ?? true,
-      createdAt: map['created_at'] != null 
-        ? DateTime.parse(map['created_at']) 
-        : DateTime.now(),
-      updatedAt: map['updated_at'] != null 
-        ? DateTime.parse(map['updated_at']) 
-        : DateTime.now(),
-      products: products,
-    );
+  // Méthode pour obtenir l'ID sous forme d'entier
+  int get idAsInt {
+    return int.tryParse(id) ?? 0;
   }
-}
 
-class BasketProduct {
-  final int id;
-  final int productId;
-  final String productName;
-  final String category;
-  final String unit;
-  final double quantity;
-
-  BasketProduct({
-    required this.id,
-    required this.productId,
-    required this.productName,
-    required this.category,
-    required this.unit,
-    required this.quantity,
-  });
-
-  factory BasketProduct.fromMap(Map<String, dynamic> map) {
-    return BasketProduct(
-      id: map['id'],
-      productId: map['product_id'],
-      productName: map['name'],
-      category: map['category'] ?? '',
-      unit: map['unit'] ?? '',
-      quantity: map['quantity'] ?? 0.0,
+  factory Basket.fromJson(Map<String, dynamic> json) {
+    return Basket(
+      id: json['id'].toString(), // Convertir en chaîne de caractères
+      name: json['name'],
+      price: double.parse(json['price'].toString()),
+      description: json['description'] ?? '',
+      imageUrl: json['image_url'] ?? '',
+      weight: json['weight'] ?? '',
+      products: json['products'] != null
+          ? List<BasketProduct>.from(
+              json['products'].map((product) => BasketProduct.fromJson(product)))
+          : [],
     );
   }
 }

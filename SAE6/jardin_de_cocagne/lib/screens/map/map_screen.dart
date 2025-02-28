@@ -1,117 +1,163 @@
-// lib/screens/map/map_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:jardin_de_cocagne/screens/home/home_screen.dart';
-import 'package:jardin_de_cocagne/screens/shop/shop_screen.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:jardin_de_cocagne/repositories/route_repository.dart';
-import 'package:jardin_de_cocagne/models/delivery_route.dart';
+import 'package:jardin_de_cocagne/models/delivery_point.dart';
+import 'package:jardin_de_cocagne/repositories/delivery_point_repository.dart';
 
-class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+class DeliveryMapScreen extends StatefulWidget {
+  const DeliveryMapScreen({super.key});
 
   @override
-  State<MapScreen> createState() => _MapScreenState();
+  State<DeliveryMapScreen> createState() => _DeliveryMapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
   final MapController _mapController = MapController();
-  final RouteRepository _routeRepository = RouteRepository();
-  
-  List<DeliveryRoute> _routes = [];
-  List<String> _availableDays = [];
-  String _selectedDay = 'Lundi';
-  bool _isLoading = false;
+  final Set<Marker> _markers = {};
+  bool _isLoading = true;
+  String _currentDay = 'Mardi';
+  List<DeliveryPoint> _currentPoints = [];
+  String? _error;
 
-  // Centre initial sur Montpellier
-  final LatLng _initialPosition = const LatLng(43.610769, 3.876716);
+  final List<String> _availableDays = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'];
+  final DeliveryPointRepository _repository = DeliveryPointRepository();
 
   @override
   void initState() {
     super.initState();
     _loadAvailableDays();
+    _loadPointsForDay(_currentDay);
+  }
+  
+  Future<void> _loadAvailableDays() async {
+    try {
+      final days = await _repository.getAvailableDeliveryDays();
+      if (days.isNotEmpty) {
+        setState(() {
+          _availableDays.clear();
+          _availableDays.addAll(days);
+          _currentDay = days.first;
+        });
+        _loadPointsForDay(_currentDay);
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Impossible de charger les jours disponibles';
+      });
+    }
   }
 
-  Future<void> _loadAvailableDays() async {
+  Future<void> _loadPointsForDay(String day) async {
     setState(() {
       _isLoading = true;
+      _error = null;
+      _currentDay = day;
     });
-    
+
     try {
-      final days = await _routeRepository.getAvailableDays();
+      final points = await _repository.getDeliveryPointsByDay(day);
       
       setState(() {
-        _availableDays = days;
-        if (days.isNotEmpty) {
-          _selectedDay = days.first;
-        }
+        _currentPoints = points;
+        _isLoading = false;
       });
       
-      // Charger les trajets pour le jour sélectionné
-      if (_availableDays.isNotEmpty) {
-        await _loadRoutesForDay(_selectedDay);
-      }
+      _createMarkers();
+      _centerMapOnPoints();
     } catch (e) {
-      // Gérer l'erreur (pourrait afficher un message)
-      print('Erreur lors du chargement des jours: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      setState(() {
+        _error = 'Impossible de charger les points de livraison';
+        _isLoading = false;
+      });
     }
   }
 
-  Future<void> _loadRoutesForDay(String day) async {
-    setState(() {
-      _isLoading = true;
-    });
+  void _createMarkers() {
+  setState(() {
+    _markers.clear();
     
-    try {
-      final routes = await _routeRepository.getRoutesByDay(day);
-      
-      if (mounted) {
-        setState(() {
-          _routes = routes;
-        });
-      }
-    } catch (e) {
-      // Gérer l'erreur
-      print('Erreur lors du chargement des trajets: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+    for (var i = 0; i < _currentPoints.length; i++) {
+      final point = _currentPoints[i];
+      _markers.add(
+        Marker(
+          width: 40.0,
+          height: 40.0,
+          point: LatLng(point.latitude, point.longitude),
+          child: GestureDetector(
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text(point.name),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(point.city ?? point.address),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Statut: ${point.deliveryStatus}',
+                        style: TextStyle(
+                          color: point.getStatusColor(),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: point.getStatusColor(),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: Center(
+                child: Text(
+                  '${i + 1}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
     }
-  }
+  });
+}
 
-  List<List<LatLng>> _getRoutePoints() {
-    List<List<LatLng>> routePoints = [];
+  void _centerMapOnPoints() {
+    if (_currentPoints.isEmpty) return;
     
-    for (final route in _routes) {
-      List<LatLng> points = route.deliveryPoints.map((point) {
-        return LatLng(point.latitude, point.longitude);
-      }).toList();
-      
-      routePoints.add(points);
+    double minLat = _currentPoints.first.latitude;
+    double maxLat = _currentPoints.first.latitude;
+    double minLng = _currentPoints.first.longitude;
+    double maxLng = _currentPoints.first.longitude;
+    
+    for (var point in _currentPoints) {
+      if (point.latitude < minLat) minLat = point.latitude;
+      if (point.latitude > maxLat) maxLat = point.latitude;
+      if (point.longitude < minLng) minLng = point.longitude;
+      if (point.longitude > maxLng) maxLng = point.longitude;
     }
     
-    return routePoints;
+    final center = LatLng((minLat + maxLat) / 2, (minLng + maxLng) / 2);
+    
+    _mapController.move(center, 11.0);
   }
 
   @override
   Widget build(BuildContext context) {
-    final routePoints = _getRoutePoints();
-    
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF1C3829),
         elevation: 0,
         title: const Text(
-          'CARTE DES TRAJETS',
+          'POINTS DE DÉPÔT',
           style: TextStyle(
             fontFamily: 'LilitaOne',
             color: Color.fromARGB(255, 255, 255, 240),
@@ -119,266 +165,169 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ),
       ),
-      body: Column(
+      body: Stack(
         children: [
-          // Sélecteur de jour
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            color: const Color(0xFFF5F5F5),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: _availableDays.map((day) => 
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: ChoiceChip(
-                      label: Text(day),
-                      selected: _selectedDay == day,
-                      selectedColor: const Color(0xFF1C3829),
-                      labelStyle: TextStyle(
-                        color: _selectedDay == day ? Colors.white : Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      onSelected: (selected) {
-                        if (selected) {
-                          setState(() {
-                            _selectedDay = day;
-                          });
-                          _loadRoutesForDay(day);
-                        }
-                      },
-                    ),
-                  )
-                ).toList(),
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: LatLng(48.17436, 6.44962),
+              initialZoom: 11,
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.jardindecocagne.app',
+              ),
+              MarkerLayer(markers: _markers.toList()),
+            ],
+          ),
+          if (_isLoading)
+            const Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFF1C3829),
               ),
             ),
+          if (_error != null)
+            _buildErrorWidget(),
+          Positioned(
+            top: 16,
+            left: 16,
+            right: 16,
+            child: _buildDaySelector(),
           ),
-          
-          // Carte
-          Expanded(
-            child: Stack(
-              children: [
-                FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(
-                    initialCenter: _initialPosition,
-                    initialZoom: 12.0,
-                    minZoom: 5.0,
-                    maxZoom: 18.0,
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.cocagne.app',
-                    ),
-                    
-                    // Afficher tous les trajets
-                    PolylineLayer(
-                      polylines: [
-                        for (final route in routePoints)
-                          Polyline(
-                            points: route,
-                            color: const Color(0xFF1C3829),
-                            strokeWidth: 4.0,
-                          ),
-                      ],
-                    ),
-                    
-                    // Points de départ, arrivée et intermédiaires
-                    MarkerLayer(
-                      markers: [
-                        for (final route in routePoints) ...[
-                          // Point de départ (vert)
-                          if (route.isNotEmpty)
-                            Marker(
-                              width: 80,
-                              height: 80,
-                              point: route.first,
-                              child: Column(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(4),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.2),
-                                          blurRadius: 3,
-                                        ),
-                                      ]
-                                    ),
-                                    child: const Text(
-                                      'Départ',
-                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                  const Icon(
-                                    Icons.trip_origin,
-                                    color: Colors.green,
-                                    size: 24,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          // Point d'arrivée (rouge)
-                          if (route.length > 1)
-                            Marker(
-                              width: 80,
-                              height: 80,
-                              point: route.last,
-                              child: Column(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(4),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.2),
-                                          blurRadius: 3,
-                                        ),
-                                      ]
-                                    ),
-                                    child: const Text(
-                                      'Arrivée',
-                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                  const Icon(
-                                    Icons.location_on,
-                                    color: Colors.red,
-                                    size: 30,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          // Points intermédiaires
-                          for (int i = 1; i < route.length - 1; i++)
-                            Marker(
-                              point: route[i],
-                              child: const Icon(
-                                Icons.circle,
-                                color: Colors.blue,
-                                size: 14,
-                              ),
-                            ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-                
-                // Indicateur de chargement
-                if (_isLoading)
-                  Container(
-                    color: Colors.black.withOpacity(0.3),
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF1C3829),
-                      ),
-                    ),
-                  ),
-                  
-                // Légende
-                Positioned(
-                  right: 16,
-                  top: 16,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 5,
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.trip_origin, color: Colors.green, size: 16),
-                            const SizedBox(width: 8),
-                            Text('Départ', style: TextStyle(fontSize: 12)),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.circle, color: Colors.blue, size: 12),
-                            const SizedBox(width: 8),
-                            Text('Étape', style: TextStyle(fontSize: 12)),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.location_on, color: Colors.red, size: 16),
-                            const SizedBox(width: 8),
-                            Text('Arrivée', style: TextStyle(fontSize: 12)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget() {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              color: Colors.red,
+              size: 48,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _error!,
+              style: const TextStyle(fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => _loadPointsForDay(_currentDay),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1C3829),
+              ),
+              child: const Text('Réessayer'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDaySelector() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Sélectionnez un jour',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1C3829),
             ),
           ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _availableDays.map((day) {
+                final isSelected = day == _currentDay;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ElevatedButton(
+                    onPressed: () => _loadPointsForDay(day),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isSelected ? const Color(0xFF1C3829) : Colors.white,
+                      foregroundColor: isSelected ? Colors.white : const Color(0xFF1C3829),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      side: BorderSide(
+                        color: const Color(0xFF1C3829),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(day),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          if (!_isLoading && _error == null) ...[
+            const SizedBox(height: 8),
+            if (_currentPoints.isEmpty)
+              const Text(
+                'Aucun point de dépôt pour ce jour',
+                style: TextStyle(
+                  fontStyle: FontStyle.italic,
+                ),
+              )
+            else
+              Text(
+                '${_currentPoints.length} points de dépôt',
+                style: const TextStyle(
+                  color: Colors.grey,
+                ),
+              ),
+            if (_currentDay == 'Mardi')
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.orange),
+                ),
+                child: const Text(
+                  'Attention, nous ne livrons pas de fruits le mardi',
+                  style: TextStyle(
+                    color: Colors.orange,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+          ],
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white,
-        elevation: 8,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.green[800],
-        unselectedItemColor: Colors.grey[600],
-        currentIndex: 3, // Onglet Trajets
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Accueil',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_basket),
-            label: 'Paniers',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_basket, color: Colors.transparent),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: 'Trajets',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today),
-            label: 'Calendrier',
-          ),
-        ],
-        onTap: (index) {
-          if (index == 0) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const HomePage()),
-            );
-          }
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _mapController.moveAndRotate(_initialPosition, 12.0, 0);
-        },
-        backgroundColor: const Color(0xFF1C3829),
-        child: const Icon(Icons.my_location, color: Colors.white),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
     );
   }
 }

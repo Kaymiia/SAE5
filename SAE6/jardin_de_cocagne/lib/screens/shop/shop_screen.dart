@@ -3,8 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:jardin_de_cocagne/screens/map/map_screen.dart';
 import 'package:jardin_de_cocagne/screens/home/home_screen.dart';
 import 'package:jardin_de_cocagne/models/basket.dart';
-import 'package:jardin_de_cocagne/repositories/basket_repository.dart' as repo;
+import 'package:jardin_de_cocagne/repositories/basket_repository.dart';
+import 'package:jardin_de_cocagne/screens/subscription/subscription_screen.dart';
 import 'basket_detail_screen.dart';
+
+// Import the subscription dialog
+import 'subscription_dialog.dart';
 
 class ShopScreen extends StatefulWidget {
   const ShopScreen({super.key});
@@ -14,7 +18,7 @@ class ShopScreen extends StatefulWidget {
 }
 
 class _ShopScreenState extends State<ShopScreen> {
-  final repo.BasketRepository _basketRepository = repo.BasketRepository();
+  final BasketRepository _basketRepository = BasketRepository();
   List<Basket> _baskets = [];
   bool _isLoading = true;
   String _errorMessage = '';
@@ -30,7 +34,6 @@ class _ShopScreenState extends State<ShopScreen> {
       _isLoading = true;
       _errorMessage = '';
     });
-    
     try {
       final baskets = await _basketRepository.getAllBaskets();
       setState(() {
@@ -43,6 +46,15 @@ class _ShopScreenState extends State<ShopScreen> {
         _errorMessage = 'Erreur lors du chargement des paniers: $e';
       });
     }
+  }
+
+  void _showSubscriptionDialog(Basket basket) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return SubscriptionDialog(basket: basket);
+      },
+    );
   }
 
   @override
@@ -101,28 +113,24 @@ class _ShopScreenState extends State<ShopScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => BasketDetailScreen(basket: basket),
+                                builder: (context) => BasketDetailScreen(
+                                  basketId: basket.id,
+                                  basket: basket, // Passe l'objet basket directement
+                                ),
                               ),
                             );
                           },
                           onAddPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('${basket.name} ajouté à votre panier'),
-                                backgroundColor: Colors.green[800],
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
+                            _showSubscriptionDialog(basket);
                           },
                         );
                       },
                     ),
                   ),
       ),
-      // Même code pour le bottom navigation bar (non modifié)
+      // Bottom navigation bar code remains the same
       bottomNavigationBar: SizedBox(
         child: Stack(
-          // Le reste du code reste identique
           alignment: Alignment.bottomCenter,
           clipBehavior: Clip.none,
           children: [
@@ -192,7 +200,7 @@ class _ShopScreenState extends State<ShopScreen> {
                   if (index == 3) {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const MapScreen()),
+                      MaterialPageRoute(builder: (context) => const DeliveryMapScreen()),
                     );
                   }
                 },
@@ -239,6 +247,7 @@ class _ShopScreenState extends State<ShopScreen> {
   }
 }
 
+// BasketCard component remains the same
 class BasketCard extends StatelessWidget {
   final Basket basket;
   final VoidCallback onDetailsPressed;
@@ -257,6 +266,7 @@ class BasketCard extends StatelessWidget {
     final productNames = basket.products.map((p) => p.productName).toList();
     
     return Card(
+      // The rest of the BasketCard implementation remains the same
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -272,20 +282,7 @@ class BasketCard extends StatelessWidget {
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                 child: Hero(
                   tag: 'basketImage${basket.id}',
-                  child: Image.asset(
-                    basket.imageUrl,
-                    height: 180,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        height: 180,
-                        width: double.infinity,
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.broken_image, size: 50),
-                      );
-                    },
-                  ),
+                  child: _buildBasketImage(basket.imageUrl),
                 ),
               ),
               Positioned(
@@ -309,8 +306,7 @@ class BasketCard extends StatelessWidget {
             ],
           ),
           
-          // Reste du code pour le contenu du panier, similaire à l'original
-          // mais utilisant basket et productNames
+          // Contenu du panier
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -373,7 +369,7 @@ class BasketCard extends StatelessWidget {
                       backgroundColor: Colors.green[50],
                       side: BorderSide(color: Colors.green[200]!),
                       label: Text(
-                        product,
+                        product ?? '',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.green[800],
@@ -418,7 +414,7 @@ class BasketCard extends StatelessWidget {
                           ),
                         ),
                         child: const Text(
-                          'Ajouter',
+                          'S\'abonner',
                           style: TextStyle(
                             color: Colors.white,
                           ),
@@ -433,5 +429,40 @@ class BasketCard extends StatelessWidget {
         ],
       ),
     );
+  }
+  
+  Widget _buildBasketImage(String imageUrl) {
+    // Détermine si l'image est une URL ou un chemin d'asset
+    if (imageUrl.startsWith('http')) {
+      return Image.network(
+        imageUrl,
+        height: 180,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            height: 180,
+            width: double.infinity,
+            color: Colors.grey[300],
+            child: const Icon(Icons.broken_image, size: 50),
+          );
+        },
+      );
+    } else {
+      return Image.asset(
+        imageUrl,
+        height: 180,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            height: 180,
+            width: double.infinity,
+            color: Colors.grey[300],
+            child: const Icon(Icons.broken_image, size: 50),
+          );
+        },
+      );
+    }
   }
 }
